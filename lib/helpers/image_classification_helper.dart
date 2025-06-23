@@ -7,7 +7,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 
 import 'isolate_inference.dart';
 
-class ImageClassificationHelper{
+class ImageClassificationHelper {
   String modelPath = AssetsModels.mobileNetV3.path;
   String labelPath = AssetsModels.mobileNetV3.labelPath;
 
@@ -17,7 +17,14 @@ class ImageClassificationHelper{
   late Tensor inputTensor;
   late Tensor outputTensor;
 
-  Future<void> _loadModel() async{
+  Future<void> initHelper() async {
+    await _loadLabels();
+    await _loadModel();
+    isolateInference = IsolateInference();
+    await isolateInference.start();
+  }
+
+  Future<void> _loadModel() async {
     final options = InterpreterOptions()..addDelegate(XNNPackDelegate());
 
     interpreter = await Interpreter.fromAsset(modelPath, options: options);
@@ -30,14 +37,6 @@ class ImageClassificationHelper{
     _labels = labelsRaw.split('\n');
   }
 
-
-  Future<void> initHelper() async{
-    await _loadLabels();
-    await _loadModel();
-    isolateInference = IsolateInference();
-    await isolateInference.start();
-  }
-
   Future<Map<String, double>> inferenceImage(img.Image image) async {
     var isolateModel = InferenceModel(image, interpreter.address, _labels!,
         inputTensor.shape, outputTensor.shape);
@@ -48,7 +47,6 @@ class ImageClassificationHelper{
     ReceivePort responsePort = ReceivePort();
     isolateInference.sendPort
         .send(inferenceModel..responsePort = responsePort.sendPort);
-    // get inference result.
     var results = await responsePort.first;
     return results;
   }
